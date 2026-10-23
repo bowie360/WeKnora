@@ -2007,6 +2007,12 @@ func (s *Service) executeQARequest(req *qaRequest) {
 		Content: formatIMOutboundAnswerOrFallback(outCtx, answer, req.tenant, s.defaultFileSvc, s.storageResolver),
 		IsFinal: true,
 	}
+	if _, ok := req.adapter.(ImageReplyAdapter); ok {
+		if files, cleaned := extractIMReplyImages(outCtx, reply.Content, req.tenant, s.defaultFileSvc, s.storageResolver); len(files) > 0 {
+			reply.Content = cleaned
+			reply.Files = files
+		}
+	}
 	if err := req.adapter.SendReply(outCtx, req.msg, reply); err != nil {
 		logger.Errorf(ctx, "[IM] Send reply failed: %v", err)
 		return
