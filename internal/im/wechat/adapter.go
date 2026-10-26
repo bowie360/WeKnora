@@ -50,8 +50,9 @@ func BuildCDNDownloadURL(encryptQueryParam string) string {
 
 // Compile-time interface checks.
 var (
-	_ im.Adapter        = (*Adapter)(nil)
-	_ im.FileDownloader = (*Adapter)(nil)
+	_ im.Adapter           = (*Adapter)(nil)
+	_ im.FileDownloader    = (*Adapter)(nil)
+	_ im.ImageReplyAdapter = (*Adapter)(nil)
 )
 
 // baseInfo is included in every outgoing API request body.
@@ -96,8 +97,25 @@ func (a *Adapter) HandleURLVerification(c *gin.Context) bool {
 	return false
 }
 
-// SendReply sends a text reply to the user via iLink /ilink/bot/sendmessage API.
+// SendReply sends a reply to the user via iLink /ilink/bot/sendmessage API.
+// The text content goes first as its own message; images attached to the
+// reply (ReplyMessage.Files) are then uploaded to the WeChat CDN and sent as
+// native image messages in the same conversation, so the user sees them
+// inline instead of unrenderable internal image references.
 func (a *Adapter) SendReply(ctx context.Context, incoming *im.IncomingMessage, reply *im.ReplyMessage) error {
+	if reply.Content != "" || len(reply.Files) == 0 {
+		if err := a.sendTextMessage(ctx, incoming, reply.Content); err != nil {
+			return err
+		}
+	}
+	if len(reply.Files) > 0 {
+		a.sendReplyImages(ctx, incoming, reply)
+	}
+	return nil
+}
+
+// sendTextMessage sends a plain text reply via iLink /ilink/bot/sendmessage.
+func (a *Adapter) sendTextMessage(ctx context.Context, incoming *im.IncomingMessage, content string) error {
 	contextToken := ""
 	if incoming.Extra != nil {
 		contextToken = incoming.Extra["context_token"]
@@ -114,7 +132,7 @@ func (a *Adapter) SendReply(ctx context.Context, incoming *im.IncomingMessage, r
 			"item_list": []map[string]interface{}{
 				{
 					"type":      1, // TEXT
-					"text_item": map[string]string{"text": reply.Content},
+					"text_item": map[string]string{"text": content},
 				},
 			},
 			"context_token": contextToken,

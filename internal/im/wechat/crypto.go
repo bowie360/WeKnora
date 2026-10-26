@@ -44,3 +44,26 @@ func decryptAES128ECB(ciphertext, key []byte) ([]byte, error) {
 
 	return plaintext, nil
 }
+
+// encryptAES128ECB encrypts data with AES-128-ECB and PKCS#7 padding,
+// matching the encryption iLink expects for uploaded media files.
+func encryptAES128ECB(plaintext, key []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, fmt.Errorf("new aes cipher: %w", err)
+	}
+
+	bs := block.BlockSize()
+	padLen := bs - len(plaintext)%bs
+	padded := make([]byte, len(plaintext)+padLen)
+	copy(padded, plaintext)
+	for i := len(plaintext); i < len(padded); i++ {
+		padded[i] = byte(padLen)
+	}
+
+	out := make([]byte, len(padded))
+	for i := 0; i < len(padded); i += bs {
+		block.Encrypt(out[i:i+bs], padded[i:i+bs])
+	}
+	return out, nil
+}

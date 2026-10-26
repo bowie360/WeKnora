@@ -118,8 +118,29 @@ type ReplyMessage struct {
 	IsStreaming bool
 	// IsFinal marks the last chunk of a streaming reply.
 	IsFinal bool
+	// Files contains image attachments to deliver as native platform media
+	// alongside the text reply. Only adapters implementing ImageReplyAdapter
+	// consume this field; other adapters ignore it.
+	Files []ReplyFile
 	// Extra holds platform-specific fields.
 	Extra map[string]string
+}
+
+// ReplyFile is a single image attachment carried by a ReplyMessage.
+type ReplyFile struct {
+	// FileName is the display name of the image (e.g. guide.jpg).
+	FileName string
+	// FileData is the raw image content.
+	FileData []byte
+}
+
+// ImageReplyAdapter is an optional interface for adapters that can deliver
+// ReplyMessage.Files as native media messages (for example WeChat iLink
+// image messages) instead of leaving image references in the text content.
+type ImageReplyAdapter interface {
+	// SupportsReplyImages reports whether the adapter natively delivers
+	// images attached to a reply.
+	SupportsReplyImages() bool
 }
 
 // Adapter is the interface every IM platform must implement.
